@@ -1,0 +1,30 @@
+{
+  "name": "locker_api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "jsonwebtoken": "^5.0.0",
+    "pg": "^4.0.0",
+    "restify": "^2.8.3",
+    "restify-jwt": "^0.1.0",
+    "sha1": "^1.1.0",
+    "socket.io": "^1.2.1",
+    "socketcan": "^2.0.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rudwna/locker_api.git"
+  },
+  "author": "Rud Wangrungarun",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rudwna/locker_api/issues"
+  },
+  "homepage": "https://github.com/rudwna/locker_api"
+}
