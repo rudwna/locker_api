@@ -1,6 +1,6 @@
 var restify = require('restify');
 var pg = require('pg');
-var pg_constr = "postgres://postgres:password@192.168.100.252/locker_api";
+var pg_constr = "postgres://locker_admin:password@192.168.100.252/locker_api";
 var can = require('socketcan');
 var rjwt = require('restify-jwt');
 var jwt = require('jsonwebtoken');
@@ -288,10 +288,10 @@ pg.connect(pg_constr, function(err, client, done) {
 			}
 		} else if (msg.channel == 'locker_state_update') {
 			var payload = msg.payload.split(',');
-			if (payload[1] == '0') {
-				io.sockets.emit('free', payload[0]);
-			} else if (payload[1] == '1') {
-				io.sockets.emit('reserved', payload[0]);
+			if (payload[2] == '0') {
+				io.sockets.emit('free', payload[0] + ',' + payload[1] + ',' + payload[3]);
+			} else if (payload[2] == '1') {
+				io.sockets.emit('reserved', payload[0] + ',' + payload[1]);
 			}
 		}
 	});
