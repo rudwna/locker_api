@@ -146,13 +146,14 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.get('/history', function(req, res, next) {
-		var user_id = req.user.id;
+		var locker_id = req.params['locker_id'];
+		var user_id = req.params['user_id'];
 		var page = req.params['page'] || 0;
 
 		client.query("select a.id, a.created, a.state, a.reservation_id, l.logical_id from activity a, reservation r, locker l \
-			where a.reservation_id in (select r.id from reservation r where r.personal_id = $1 order by id desc limit 5 offset $2) \
+			where a.reservation_id in (select r.id from reservation r where (r.personal_id = $1 or $1 is null) and (r.locker_id = $2 or $2 is null) order by id desc limit 5 offset $3) \
 				and a.reservation_id = r.id and r.locker_id = l.id \
-			order by a.id asc", [user_id, 5*page], function(err, result) {
+			order by a.id asc", [user_id, locker_id, 5*page], function(err, result) {
 			if (err) {
 				return;
 			}
