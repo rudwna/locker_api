@@ -172,23 +172,48 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.get('/lockers/unassigned', function(req, res, next) {
-		client.query('select * from locker where logical_id is null order by id', function(err, res) {
+		client.query('select * from locker where logical_id is null order by id', function(err, result) {
 			if (err) throw err;
 
-			res.send(res.rows);
+			res.send(result.rows);
 		});
 
 		return next();
 	});
 
 	server.post('/lockers/assign', function(req, res, next) {
+		var err_lockers = [];
+
+		function conclude() {
+			console.log(err_lockers);
+			if (err_lockers.length > 0) {
+				res.send(400, {code: 'xxx', message: 'ไม่สามารถกำหนดค่าล็อกเกอร์หมายเลข ' + err_lockers.join(', ')});
+			} else {
+				res.send(200);
+			}
+		}
+
+		req.params.lockers.forEach(function(locker, index) {
+			client.query('update locker set logical_id=$1, configured_on=now() where id=$2', [locker.assign_no, locker.id], function(err, result) {
+				console.log(err);
+				if (err) {
+					err_lockers.push(locker.assign_no);
+				}
+
+				if (index+1 == req.params.lockers.length) {
+					conclude();
+				}
+
+			});
+
+		});
 
 	});
 
 	server.get('/settings', function(req, res, next) {
-		client.query('select * from settings', function(req, res, next) {
+		client.query('select * from settings', function(err, result) {
 			if (err) throw err;
-			res.send(res.rows);
+			res.send(result.rows);
 		});
 
 		return next();
@@ -221,7 +246,7 @@ pg.connect(pg_constr, function(err, client, done) {
 			var state = result.rows[0].state;
 
 			if (state != 1 && state != 3) {
-				res.send(401, { code: 'R002', message: 'สถานะในการเปิดไม่ถูกต้อง' });
+				res.send(400, { code: 'R002', message: 'สถานะในการเปิดไม่ถูกต้อง' });
 			} else {
 				client.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, result) {
 					if (err) throw err;
@@ -286,7 +311,7 @@ pg.connect(pg_constr, function(err, client, done) {
 			var state = result.rows[0].state;
 
 			if (state != 1 && state != 3) {
-				res.send(401, { code: 'R004', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
+				res.send(400, { code: 'R004', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
 			} else {
 				// conn.query("SELECT count(*) as count FROM reservation WHERE id IN (select max(id) from reservation group by locker_id) and personal_id=? group by personal_id", [personal_id], function(err, rows, result) {
 				// TODO: using dynamic id from RFID card
