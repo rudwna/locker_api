@@ -171,6 +171,45 @@ pg.connect(pg_constr, function(err, client, done) {
 		return next();
 	});
 
+	server.get('/lockers/unassigned', function(req, res, next) {
+		client.query('select * from locker where logical_id is null order by id', function(err, res) {
+			if (err) throw err;
+
+			res.send(res.rows);
+		});
+
+		return next();
+	});
+
+	server.post('/lockers/assign', function(req, res, next) {
+
+	});
+
+	server.get('/settings', function(req, res, next) {
+		client.query('select * from settings', function(req, res, next) {
+			if (err) throw err;
+			res.send(res.rows);
+		});
+
+		return next();
+	});
+
+	server.put('/settings', function(req, res, next) {
+
+	});
+
+	server.post('/lockers/:logical_id/clear_no', function(req, res, next) {
+		var logical_id = req.params['logical_id'];
+
+		client.query('select id, state from locker where is_alive=false and logical_id=$1', [logical_id], function(err, result) {
+			var locker_id = result.rows[0].id;
+			client.query('update locker set logical_id=NULL, configured_on=NULL where id=$1', [locker_id], function(err) {
+				if (err) throw err;
+				res.send(200);
+			});
+		});
+	});
+
 	// This method is not to be used by normal user
 	// user'll typically open and close locker by RFID authorization
 	// which sen CAN message the controller
