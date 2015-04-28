@@ -185,7 +185,6 @@ pg.connect(pg_constr, function(err, client, done) {
 		var err_lockers = [];
 
 		function conclude() {
-			console.log(err_lockers);
 			if (err_lockers.length > 0) {
 				res.send(400, {code: 'xxx', message: 'ไม่สามารถกำหนดค่าล็อกเกอร์หมายเลข ' + err_lockers.join(', ')});
 			} else {
@@ -195,19 +194,18 @@ pg.connect(pg_constr, function(err, client, done) {
 
 		req.params.lockers.forEach(function(locker, index) {
 			client.query('update locker set logical_id=$1, configured_on=now() where id=$2', [locker.assign_no, locker.id], function(err, result) {
-				console.log(err);
 				if (err) {
 					err_lockers.push(locker.assign_no);
+				} else {
+					var confd = { id: 0x200 + locker.id, ext: false, data: new Buffer([])};
+					can_ch.send(confd);
 				}
 
 				if (index+1 == req.params.lockers.length) {
 					conclude();
 				}
-
 			});
-
 		});
-
 	});
 
 	server.get('/settings', function(req, res, next) {
@@ -220,7 +218,35 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.put('/settings', function(req, res, next) {
+		client.query("update settings set value=$1 where name='reserve_timeout'", [req.params.reserve_timeout], function(err, result) {
+			if (err) {
+				res.send(400, {code: 'xxx', message: err.toString()});
+			} else {
+				res.send(200);
+			}
+		});
 
+
+		// var err_settings = [];
+
+		// function conclude() {
+		// 	if (err_settings.length > 0) {
+		// 		res.send(400, {code: 'xxx', message: 'ไม่สามารถกำหนดค่า ' + err_settings.join(', ')});
+		// 	} else {
+		// 		res.send(200);
+		// 	}
+		// }
+
+		// req.params.settings.forEach(function(setting, index) {
+		// 	client.query('update setting set value=$1 where name=$2', [setting.value, setting.name], function(err, result) {
+		// 		if (err) {
+		// 			err_settings.push(setting.name);
+		// 		}
+		// 		if (index+1 == req.params.settings.length) {
+		// 			conclude();
+		// 		}
+		// 	});
+		// });
 	});
 
 	server.post('/lockers/:logical_id/clear_no', function(req, res, next) {
