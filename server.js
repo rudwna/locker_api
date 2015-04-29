@@ -119,13 +119,12 @@ pg.connect(pg_constr, function(err, client, done) {
 			client.query('select id, logical_id, state from locker where id = $1', [locker_id], function(err, result) {
 				var locker = result.rows[0];
 
-				console.log('locker ' + locker_id + ' closing');
-
 				client.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id = $1)", [locker_id], function(err, result) {
 					if (err) throw err;
 
 					if (2 != locker.state) {
-						throw "Invalid closing state";
+						// throw "Invalid closing state";
+						return;
 					} else {
 						client.query("UPDATE locker SET state = 3 WHERE id=$1", [locker_id], function(err, result) {
 							if (err) throw err;
