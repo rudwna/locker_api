@@ -69,7 +69,12 @@ pg.connect(pg_constr, function(err, client, done) {
 							var regd = { id: 0x180 + locker_id, ext: false, data: new Buffer([])};
 							can_ch.send(regd);
 						} else {
-							var confd = { id: 0x200 + locker_id, ext: false, data: new Buffer([])};
+							var state = result.rows[0].state;
+
+							// remap reserved/opened to normal reserved state on LU
+							if (3 == state) state = 1;
+
+							var confd = { id: 0x200 + locker_id, ext: false, data: new Buffer([state])};
 							can_ch.send(confd);
 						}
 						
