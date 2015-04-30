@@ -108,7 +108,7 @@ pg.connect(pg_constr, function(err, client, done) {
 						// if (err) throw err;
 						// console.log('locker ' + locker_id + ' opened');
 
-						var canmsg = { id: 0x380 + locker_id, ext: false, data: new Buffer([locker_id]) };
+						var canmsg = { id: 0x380 + locker_id, ext: false, data: new Buffer([]) };
 						can_ch.send(canmsg);
 					});
 
@@ -116,11 +116,15 @@ pg.connect(pg_constr, function(err, client, done) {
 			})
 
 		} else if (can_cmd == 0x400) {
-			client.query('select id, logical_id, state from locker where id = $1', [locker_id], function(err, result) {
+			client.query('select id, logical_id, state from locker where state=2 and id=$1', [locker_id], function(err, result) {
 				var locker = result.rows[0];
 
-				client.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id = $1)", [locker_id], function(err, result) {
+				client.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id = $1)", [locker_id], function(err, result_i) {
 					if (err) throw err;
+
+					if (result_i.rows.length == 0) {
+						return;
+					}
 
 					if (2 != locker.state) {
 						// throw "Invalid closing state";

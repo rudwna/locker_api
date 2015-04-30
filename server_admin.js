@@ -150,27 +150,6 @@ pg.connect(pg_constr, function(err, client, done) {
 			}
 		});
 
-
-		// var err_settings = [];
-
-		// function conclude() {
-		// 	if (err_settings.length > 0) {
-		// 		res.send(400, {code: 'xxx', message: 'ไม่สามารถกำหนดค่า ' + err_settings.join(', ')});
-		// 	} else {
-		// 		res.send(200);
-		// 	}
-		// }
-
-		// req.params.settings.forEach(function(setting, index) {
-		// 	client.query('update setting set value=$1 where name=$2', [setting.value, setting.name], function(err, result) {
-		// 		if (err) {
-		// 			err_settings.push(setting.name);
-		// 		}
-		// 		if (index+1 == req.params.settings.length) {
-		// 			conclude();
-		// 		}
-		// 	});
-		// });
 	});
 
 	server.post('/lockers/:logical_id/clear_no', function(req, res, next) {
@@ -184,6 +163,12 @@ pg.connect(pg_constr, function(err, client, done) {
 			});
 		});
 	});
+
+	server.post('lockers/all/open', function(req, res) {
+		var canmsg = { id: 0x500, ext: false, data: new Buffer([]) };
+		can_ch.send(canmsg);
+		res.send(200);
+	})
 
 	// This method is not to be used by normal user
 	// user'll typically open and close locker by RFID authorization
