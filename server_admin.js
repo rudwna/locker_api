@@ -32,7 +32,7 @@ io.sockets.on('connection', function(socket) {
 	console.log('user connected');
 })
 
-pg.connect(pg_constr, function(err, client, done) {
+pg.connect(pg_constr, function(err, pgc, done) {
 	if (err) {
 		console.error('Error A00X: Error creating database client. Please check database connection is working.', err);
 		process.exit(1);
@@ -47,7 +47,7 @@ pg.connect(pg_constr, function(err, client, done) {
 			res.send(401, {code: 'emptyuserpassword', message: 'ชื่อผู้ใช้หรือรหัสผ่านเป็นค่าว่าง'});
 		}
 
-		client.query('select id from locker_user where username = $1 and password = $2 and is_admin = true', [username, sha1(password)], function(err, result) {
+		pgc.query('select id from locker_user where username = $1 and password = $2 and is_admin = true', [username, sha1(password)], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Error getting user data from database');
 				return res.send(401, {code: 'L00X', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
@@ -74,7 +74,7 @@ pg.connect(pg_constr, function(err, client, done) {
 		var user_id = req.params['user_id'];
 		var page = req.params['page'] || 0;
 
-		client.query("select a.id, a.created, a.state, a.reservation_id, l.logical_id from activity a, reservation r, locker l \
+		pgc.query("select a.id, a.created, a.state, a.reservation_id, l.logical_id from activity a, reservation r, locker l \
 			where a.reservation_id in (select r.id from reservation r where (r.personal_id = $1 or $1 is null) and (r.locker_id = $2 or $2 is null) order by id desc limit 5 offset $3) \
 				and a.reservation_id = r.id and r.locker_id = l.id \
 			order by a.id asc", [user_id, locker_id, 5*page], function(err, result) {
@@ -87,7 +87,7 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.get('/lockers', function(req, res, next) {
-		client.query('select * from locker where logical_id is not null order by logical_id asc', function(err, result) {
+		pgc.query('select * from locker where logical_id is not null order by logical_id asc', function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
 				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
@@ -99,7 +99,7 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.get('/lockers/unassigned', function(req, res, next) {
-		client.query('select * from locker where logical_id is null order by id', function(err, result) {
+		pgc.query('select * from locker where logical_id is null order by id', function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
 				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
@@ -123,7 +123,7 @@ pg.connect(pg_constr, function(err, client, done) {
 		}
 
 		req.params.lockers.forEach(function(locker, index) {
-			client.query('update locker set logical_id=$1, configured_on=now() where id=$2', [locker.assign_no, locker.id], function(err, result) {
+			pgc.query('update locker set logical_id=$1, configured_on=now() where id=$2', [locker.assign_no, locker.id], function(err, result) {
 				if (err) {
 					console.log('Error D00X: Cannot assign locker number')
 					err_lockers.push(locker.assign_no);
@@ -140,7 +140,7 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.get('/settings', function(req, res, next) {
-		client.query('select * from settings', function(err, result) {
+		pgc.query('select * from settings', function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get system settings')
 				res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลการตั้งค่า'});
@@ -153,7 +153,7 @@ pg.connect(pg_constr, function(err, client, done) {
 	});
 
 	server.put('/settings', function(req, res, next) {
-		client.query("update settings set value=$1 where name='reserve_timeout'", [req.params.reserve_timeout], function(err, result) {
+		pgc.query("update settings set value=$1 where name='reserve_timeout'", [req.params.reserve_timeout], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot update system settings')
 				res.send(400, {code: 'D00X', message: err.toString()});
@@ -167,13 +167,13 @@ pg.connect(pg_constr, function(err, client, done) {
 	server.post('/lockers/:logical_id/clear_no', function(req, res, next) {
 		var logical_id = req.params['logical_id'];
 
-		client.query('select id, state from locker where is_alive=false and logical_id=$1', [logical_id], function(err, result) {
+		pgc.query('select id, state from locker where is_alive=false and logical_id=$1', [logical_id], function(err, result) {
 			if (err) {
 					console.log('Error D00X: Cannot get locker data from database')
 					res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
 			}
 			var locker_id = result.rows[0].id;
-			client.query('update locker set logical_id=NULL, configured_on=NULL where id=$1', [locker_id], function(err) {
+			pgc.query('update locker set logical_id=NULL, configured_on=NULL where id=$1', [locker_id], function(err) {
 				if (err) {
 					console.log('Error D00X: Cannot clear locker number')
 					res.send(400, {code: 'D00X', message: 'ไม่สามารถล่างหมายเลขล็อกเกอร์ได้'});
@@ -194,7 +194,7 @@ pg.connect(pg_constr, function(err, client, done) {
 	server.post('lockers/:logical_id/open', function(req, res) {
 		var logical_id = req.params['logical_id'];
 
-		client.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
+		pgc.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database')
 				res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
@@ -207,7 +207,7 @@ pg.connect(pg_constr, function(err, client, done) {
 				console.log('Error D00X: Invalid locker state for opening')
 				res.send(400, { code: 'R002', message: 'สถานะในการเปิดไม่ถูกต้อง' });
 			} else {
-				client.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, result) {
+				pgc.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, result) {
 					if (err) {
 						console.log('Error D00X: Cannot get reservation data from database')
 						res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลลการจองได้'});
@@ -217,11 +217,11 @@ pg.connect(pg_constr, function(err, client, done) {
 					// error not handled
 					// TODO: log the error
 					if (!result.rows[0].is_activated) {
-						client.query("UPDATE reservation SET is_activated = 't' WHERE id = $1", [result.rows[0].id]);
+						pgc.query("UPDATE reservation SET is_activated = 't' WHERE id = $1", [result.rows[0].id]);
 					}
 
 					// update locker state to 'open'
-					client.query("UPDATE locker SET state = 2 WHERE id=$1", [locker_id], function(err, result) {
+					pgc.query("UPDATE locker SET state = 2 WHERE id=$1", [locker_id], function(err, result) {
 						if (err) {
 							// note: this invalidate the flow of system
 							// if is_activated is set but the locker state is not updated
@@ -244,7 +244,7 @@ pg.connect(pg_constr, function(err, client, done) {
 
 	server.post('lockers/:logical_id/release', function(req, res) {
 		var logical_id = req.params['logical_id'];
-		client.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
+		pgc.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
 				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้ ' + logical_id + ' ได้'});
@@ -259,13 +259,13 @@ pg.connect(pg_constr, function(err, client, done) {
 			} else {
 				// conn.query("SELECT count(*) as count FROM reservation WHERE id IN (select max(id) from reservation group by locker_id) and personal_id=? group by personal_id", [personal_id], function(err, rows, result) {
 				// TODO: using dynamic id from RFID card
-				client.query("SELECT id FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, rows, result) {
+				pgc.query("SELECT id FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, rows, result) {
 					if (err) {
 						console.log('Error D00X: No such reservation found');
 						return res.send(401, { code: 'L00X', message: 'ไม่พบการจองที่ต้องการ' });
 					}
 
-					client.query("UPDATE locker SET state = 4 WHERE id = $1", [locker_id], function(err, result) {
+					pgc.query("UPDATE locker SET state = 4 WHERE id = $1", [locker_id], function(err, result) {
 						if (err) {
 							console.log('Error D00X: Cannot update locker state');
 							return res.send(401, { code: 'L00X', message: 'ไม่สามารถเปลี่ยนสถานะล็อกเกอร์ได้' });
@@ -286,7 +286,7 @@ pg.connect(pg_constr, function(err, client, done) {
 
 
 	// pgsql LISTEN/NOTIFY
-	client.on('notification', function(msg) {
+	pgc.on('notification', function(msg) {
 		// console.log('notification');
 		// console.log(msg);
 		if (msg.channel == 'locker_is_alive_update') {
@@ -308,8 +308,8 @@ pg.connect(pg_constr, function(err, client, done) {
 		}
 	});
 
-	client.query('LISTEN locker_is_alive_update');
-	client.query('LISTEN locker_state_update');
+	pgc.query('LISTEN locker_is_alive_update');
+	pgc.query('LISTEN locker_state_update');
 
 });
 
