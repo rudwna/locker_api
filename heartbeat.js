@@ -1,12 +1,10 @@
+var config = require('./config');
 var pg = require('pg');
-var pg_constr = "postgres://postgres:password@192.168.100.252/locker_api";
+var pg_constr = config.sfmt("postgres://{0}:{1}@{2}/{3}", config.db.client.username, config.db.client.password,
+	config.db.host, config.db.name)
 var can = require('socketcan');
 var jwt = require('jsonwebtoken');
 var sha1 = require('sha1');
-
-// jwt secret key
-var secret = '516f51c22688937cbc71fb599c5b9896e10bc531';
-
 
 // CAN
 var can_ch = can.createRawChannel('can0', true);
