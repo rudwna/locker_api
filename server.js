@@ -299,7 +299,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 								return res.send(401, {code: 'L00X', message:'ไม่สามารถเพิ่มข้อมูลการจองได้ ' + logical_id + ' ได้'});
 							} else {
 								// TODO: add reservation_id as response
-								res.send(200, {reservation_id: });
+								res.send(200/*, {reservation_id: }*/);
 								io.sockets.emit('reserve', locker_id);
 
 								var canmsg = { id: 0x280 + locker_id, ext: false, data: new Buffer([]) };
