@@ -33,6 +33,11 @@ io.sockets.on('connection', function(socket) {
 	console.log('user connected');
 })
 
+pg.on('error', function(err, client) {
+	console.error('Error D02: Database connection error', err);
+	process.exit(1);
+})
+
 pg.connect(pg_constr, function(err, pgc, done) {
 	if (err) {
 		console.error('Error D01: Error creating database client. Please check database connection is working.', err);

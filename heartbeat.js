@@ -12,6 +12,11 @@ can_ch.start();
 
 var lockers_timeout = new Object;
 
+pg.on('error', function(err, client) {
+	console.error('Error D02: Database connection error', err);
+	process.exit(1);
+})
+
 pg.connect(pg_constr, function(err, client, done) {
 	if (err) {
 		return console.error('error fetching client from pool', err);
