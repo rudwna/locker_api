@@ -1,10 +1,10 @@
 {
   "name": "locker_api",
   "version": "1.0.0",
-  "description": "",
   "main": "server.js",
   "dependencies": {
     "jsonwebtoken": "^5.0.0",
+    "log-timestamp": "^0.1.2",
     "pg": "^4.0.0",
     "restify": "^2.8.3",
     "restify-jwt": "^0.1.0",

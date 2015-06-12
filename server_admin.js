@@ -11,6 +11,7 @@ var server = restify.createServer({
 	name: 'locker_api'
 });
 var io = require('socket.io').listen(server.server);
+var log_ts = require('log-timestamp')(function() { return '[' + new Date().toString() + ']' });
 
 restify.CORS.ALLOW_HEADERS.push('authorization');
 server.use(restify.CORS());
@@ -23,7 +24,7 @@ server.use(rjwt({ secret: config.jwt.secret }).unless( {path: ['/admin/login']} 
 var can_ch = can.createRawChannel('can0', true);
 can_ch.start();
 
-server.listen(config.service.client.port, function () {
+server.listen(config.service.operator_port, function () {
 	console.log('%s listening at %s', server.name, server.url);
 });
 
@@ -45,17 +46,20 @@ pg.connect(pg_constr, function(err, pgc, done) {
 		// Test for empty value
 		if (username == '' || password == '') {
 			res.send(401, {code: 'emptyuserpassword', message: 'ชื่อผู้ใช้หรือรหัสผ่านเป็นค่าว่าง'});
+			return next();
 		}
 
 		pgc.query('select id from locker_user where username = $1 and password = $2 and is_admin = true', [username, sha1(password)], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Error getting user data from database');
-				return res.send(401, {code: 'L00X', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
+				res.send(401, {code: 'L00X', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
+				return next();
 			}
 
 			if (result.rows.length == 0) {
 				console.log('Error D00X: User #' + username + ' not found');
-				return res.send(401, {code: 'L00X', message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
+				res.send(401, {code: 'L00X', message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
+				return next();
 			}
 
 			var profile = {
@@ -66,6 +70,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 			res.json({ token: token });
 			var token = jwt.sign(profile, config.jwt.secret);
+			return next();
 		})
 	});
 
@@ -80,9 +85,11 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			order by a.id asc", [user_id, locker_id, 5*page], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get user\'s usage history');
-				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกดูประวัติการใช้งานได้'});
+				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกดูประวัติการใช้งานได้'});
+				return next();
 			}
 			res.send(result.rows);
+			return next();
 		})
 	});
 
@@ -90,25 +97,27 @@ pg.connect(pg_constr, function(err, pgc, done) {
 		pgc.query('select * from locker where logical_id is not null order by logical_id asc', function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
-				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				return next();
 			}
 
 			res.send(result.rows);
+			return next();
 		});
-		return next();
 	});
 
 	server.get('/lockers/unassigned', function(req, res, next) {
 		pgc.query('select * from locker where logical_id is null order by id', function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
-				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				return next();
 			}
 
 			res.send(result.rows);
+			return next();
 		});
 
-		return next();
 	});
 
 	server.post('/lockers/assign', function(req, res, next) {
@@ -117,15 +126,17 @@ pg.connect(pg_constr, function(err, pgc, done) {
 		function conclude() {
 			if (err_lockers.length > 0) {
 				res.send(400, {code: 'xxx', message: 'ไม่สามารถกำหนดค่าล็อกเกอร์หมายเลข ' + err_lockers.join(', ')});
+				return next();
 			} else {
 				res.send(200);
+				return next()
 			}
 		}
 
 		req.params.lockers.forEach(function(locker, index) {
 			pgc.query('update locker set logical_id=$1, configured_on=now() where id=$2', [locker.assign_no, locker.id], function(err, result) {
 				if (err) {
-					console.log('Error D00X: Cannot assign locker number')
+					console.error('Error D00X: Cannot assign locker number')
 					err_lockers.push(locker.assign_no);
 				} else {
 					var confd = { id: 0x200 + locker.id, ext: false, data: new Buffer([])};
@@ -144,12 +155,14 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			if (err) {
 				console.log('Error D00X: Cannot get system settings')
 				res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลการตั้งค่า'});
+				return next();
 
 			}
 			res.send(result.rows);
+			return next();
 		});
 
-		return next();
+		
 	});
 
 	server.put('/settings', function(req, res, next) {
@@ -157,8 +170,10 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			if (err) {
 				console.log('Error D00X: Cannot update system settings')
 				res.send(400, {code: 'D00X', message: err.toString()});
+				return next();
 			} else {
 				res.send(200);
+				return next();
 			}
 		});
 
@@ -171,14 +186,17 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			if (err) {
 					console.log('Error D00X: Cannot get locker data from database')
 					res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+					return next()
 			}
 			var locker_id = result.rows[0].id;
 			pgc.query('update locker set logical_id=NULL, configured_on=NULL where id=$1', [locker_id], function(err) {
 				if (err) {
 					console.log('Error D00X: Cannot clear locker number')
 					res.send(400, {code: 'D00X', message: 'ไม่สามารถล่างหมายเลขล็อกเกอร์ได้'});
+					return next();
 				}
 				res.send(200);
+				return next();
 			});
 		});
 	});
@@ -188,6 +206,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 		var canmsg = { id: 0x500, ext: false, data: new Buffer([]) };
 		can_ch.send(canmsg);
 		res.send(200);
+		return next();
 	})
 
 	// Method to open specific locker
@@ -198,6 +217,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database')
 				res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				return next();
 			}
 
 			var locker_id = result.rows[0].id;
@@ -206,11 +226,13 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			if (state != 1 && state != 3) {
 				console.log('Error D00X: Invalid locker state for opening')
 				res.send(400, { code: 'R002', message: 'สถานะในการเปิดไม่ถูกต้อง' });
+				return next();
 			} else {
 				pgc.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, result) {
 					if (err) {
 						console.log('Error D00X: Cannot get reservation data from database')
 						res.send(400, {code: 'D00X', message: 'ไม่สามารถเรียกข้อมูลลการจองได้'});
+						return next();
 					}
 
 					// non-trivial
@@ -233,12 +255,13 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 						var canmsg = { id: 0x380 + locker_id, ext: false, data: new Buffer([]) };
 						can_ch.send(canmsg);
+
+						return next();
 					});
 
 				});
 			}
 		});
-		// return next();
 	});
 
 
@@ -247,7 +270,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 		pgc.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
 			if (err) {
 				console.log('Error D00X: Cannot get locker data from database');
-				return res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้ ' + logical_id + ' ได้'});
+				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้ ' + logical_id + ' ได้'});
+				return next();
 			}
 
 			var locker_id = result.rows[0].id;
@@ -255,20 +279,23 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 			if (state != 1 && state != 3) {
 				console.log('Error D00X: Invlid locker state change');
-				return res.send(401, { code: 'L00X', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
+				res.send(401, { code: 'L00X', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
+				return next()
 			} else {
 				// conn.query("SELECT count(*) as count FROM reservation WHERE id IN (select max(id) from reservation group by locker_id) and personal_id=? group by personal_id", [personal_id], function(err, rows, result) {
 				// TODO: using dynamic id from RFID card
 				pgc.query("SELECT id FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, rows, result) {
 					if (err) {
 						console.log('Error D00X: No such reservation found');
-						return res.send(401, { code: 'L00X', message: 'ไม่พบการจองที่ต้องการ' });
+						res.send(401, { code: 'L00X', message: 'ไม่พบการจองที่ต้องการ' });
+						return next();
 					}
 
 					pgc.query("UPDATE locker SET state = 4 WHERE id = $1", [locker_id], function(err, result) {
 						if (err) {
 							console.log('Error D00X: Cannot update locker state');
-							return res.send(401, { code: 'L00X', message: 'ไม่สามารถเปลี่ยนสถานะล็อกเกอร์ได้' });
+							res.send(401, { code: 'L00X', message: 'ไม่สามารถเปลี่ยนสถานะล็อกเกอร์ได้' });
+							return next()
 						}
 
 						res.send(200);
@@ -277,11 +304,11 @@ pg.connect(pg_constr, function(err, pgc, done) {
 						
 						var canmsg = { id: 0x480 + locker_id, ext: false, data: new Buffer([]) };
 						can_ch.send(canmsg);
+						return next();
 					});
 				});
 			}
 		});
-		// return next();
 	});
 
 
