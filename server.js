@@ -36,7 +36,7 @@ io.sockets.on('connection', function(socket) {
 
 pg.connect(pg_constr, function(err, pgc, done) {
 	if (err) {
-		console.error('Error A00X: Error creating database client. Please check database connection is working.', err);
+		console.error('Error D01: Error creating database client. Please check database connection is working.', err);
 		process.exit(1);
 	}
 
@@ -51,7 +51,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 				var locker = result.rows[0];
 
 				if (err) {
-					console.error('Error D00X: Error creating database client. Please check database connection is working.', err);
+					console.error('Error D002: Cannot get locker data from database', err);
 					return;
 				}
 
@@ -59,7 +59,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 				if (result.rows[0] === undefined) {
 					pgc.query('insert into locker(id, state) values ($1, $2)', [locker_id, 0], function(err, result) {
 						if (err) {
-							console.error('Error D00X: Error creating database client. Please check database connection is working.', err);
+							console.error('Error D04: Cannot insert locker data to database', err);
 							return;
 						} else {
 							var regd = { id: 0x180 + locker_id, ext: false, data: new Buffer([]) };
@@ -116,12 +116,12 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			pgc.query(query, [user_id], function(err, result_i) {
 
 				if (err) {
-					console.error('Error D00X: Cannot get locker data from database', err);
+					console.error('Error D03: Cannot get locker data from database', err);
 					return;
 				}
 
 				if (undefined === result_i.rows[0]) {
-					console.error('Error R00X: Cannot find reserved locker that match card holder\'s ID');
+					console.error('Error L01: Cannot find reserved locker that match card holder\'s ID');
 					return;
 				}
 
@@ -129,7 +129,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 				var locker_id = result_i.rows[0].id;
 				pgc.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, result_ii) {
 					if (err) {
-						console.error('Error R00X: Cannot query reservation data');
+						console.error('Error D06: Cannot get reservation data');
 						return;
 					}
 
@@ -141,7 +141,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 					// TODO: merge this to use outer query instead
 					pgc.query("UPDATE locker SET state = 2 WHERE id=$1", [locker_id], function(err, result_iii) {
 						if (err) {
-							console.error('Error D00X: Cannot update reservation data');
+							console.error('Error D05: Cannot update locker data');
 							return;
 						}
 
@@ -158,12 +158,12 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			pgc.query('select id, logical_id, state from locker where state=2 and id=$1', [locker_id], function(err, result) {
 
 				if (err) {
-					console.error('Error D00X: Cannot query locker data');
+					console.error('Error D03: Cannot get locker data from database');
 					return;					
 				}
 
 				if (result.rows.length == 0) {
-					console.error('Error D00X: Empty locker data while in closing event');
+					console.error('Error L02: No reservation data as requested');
 					return;
 				} else {
 					var locker = result.rows[0];
@@ -172,24 +172,24 @@ pg.connect(pg_constr, function(err, pgc, done) {
 				// select latest reservation of locker
 				pgc.query("SELECT id, is_activated FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id = $1)", [locker_id], function(err, result_i) {
 					if (err) {
-						console.error('Error D00X: Cannot get reservation data');
+						console.error('Error D06: Cannot get reservation data from database');
 						return;
 					}
 
 					if (result_i.rows.length == 0) {
-						console.error('Error D00X: Empty locker data while in closing event');
+						console.error('Error L03: No reservation data in closing event');
 						return;
 					}
 
 					// console.log('s'+ locker.state);
 
 					if (2 != locker.state) {
-						console.error('Error L00X: Invalid locker\'s state for closing');
+						console.error('Error L04: Invalid locker\'s state for closing');
 						return;
 					} else {
 						pgc.query("UPDATE locker SET state = 3 WHERE id=$1", [locker_id], function(err, result) {
 							if (err) {
-								console.error('Error D00X: Error updating locker data');
+								console.error('Error D05: Cannot update locker data');
 								return;
 							}
 
@@ -207,20 +207,21 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 		// Test for empty value
 		if (username == '' || password == '') {
-			res.send(401, {code: 'L00X', message: 'ชื่อผู้ใช้หรือรหัสผ่านเป็นค่าว่าง'});
+			console.error('Error L05: Blank username/password used for authenication');
+			res.send(401, {code: 'L05', message: 'ชื่อผู้ใช้หรือรหัสผ่านเป็นค่าว่าง'});
 			return next();
 		}
 
 		pgc.query('select id from locker_user where username = $1 and password = $2', [username, sha1(password)], function(err, result) {
 			if (err) {
-				console.error('Error D00X: Error getting user data from database');
-				res.send(401, {code: 'L00X', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
+				console.error('Error D09: Cannot get user data from database');
+				res.send(401, {code: 'D09', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
 				return next();
 			}
 
 			if (result.rows.length == 0) {
-				console.error('Error D00X: User #' + username + ' not found');
-				res.send(401, {code: 'L00X', message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
+				console.error('Error L06: Invalid username/password used for authentication');
+				res.send(401, {code: 'L06', message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
 				return next();
 			}
 
@@ -243,8 +244,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			select max(id) from reservation group by locker_id \
 			) and l.state > 0 and personal_id = $1 and l.id = r.locker_id', [user_id], function(err, result) {
 			if (err) {
-				console.error('Error D00X: Cannot get user\'s reservation state');
-				res.send(401, {code: 'L00X', message:'ไม่สามารถตรวจสอบสถานะการจองของผู้ใช้ได้'});
+				console.error('Error D06: Cannot get reservation data from database');
+				res.send(401, {code: 'D06', message:'ไม่สามารถตรวจสอบสถานะการจองของผู้ใช้ได้'});
 				return next();
 			}
 
@@ -262,8 +263,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 				and a.reservation_id = r.id and r.locker_id = l.id \
 			order by a.id asc", [user_id, 5*page], function(err, result) {
 			if (err) {
-				console.error('Error D00X: Cannot get user\'s usage history');
-				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกดูประวัติการใช้งานได้'});
+				console.error('Error D10: Cannot get user\'s usage history from database');
+				res.send(401, {code: 'D10', message:'ไม่สามารถเรียกดูประวัติการใช้งานได้'});
 				return next();
 			}
 			res.send(result.rows);
@@ -274,8 +275,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 	server.get('/lockers', function(req, res, next) {
 		pgc.query('select * from locker where logical_id is not null order by logical_id asc', function(err, result) {
 			if (err) {
-				console.error('Error D00X: Cannot get locker data from database');
-				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
+				console.error('Error D03: Cannot get locker data from database');
+				res.send(401, {code: 'D03', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
 				return next();
 			}
 
@@ -290,8 +291,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 		pgc.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
 			if (err) {
-				console.error('Error D00X: Cannot get locker data from database');
-				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้ ' + logical_id + ' ได้'});
+				console.error('Error D03: Cannot get locker data from database');
+				res.send(401, {code: 'D03', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
 				return next();
 			}
 
@@ -299,15 +300,15 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			var state = result.rows[0].state;
 
 			if (state != 0) {
-				console.error('Error D00X: Locker not available for reservation');
-				res.send(401, { code: 'R001', message: 'สถานะในการจองไม่ถูกต้อง' });
+				console.error('Error L07: Locker not available for reservation');
+				res.send(401, { code: 'L07', message: 'ไม่สามารถจองล็อกเกอร์ได้ (ล็อกเกอร์ไม่พร้อมให้บริการ)' });
 				return next();
 			} else {
 				pgc.query('insert into reservation(locker_id, personal_id) values ($1, $2)',
 						[locker_id, user_id], function(err, result) {
 							if (err) {
-								console.error('Error D00X: Cannot insert locker information to database');
-								res.send(401, {code: 'L00X', message:'ไม่สามารถเพิ่มข้อมูลการจองได้ ' + logical_id + ' ได้'});
+								console.error('Error D07: Cannot insert reservation data to database');
+								res.send(401, {code: 'L00X', message:'ไม่สามารถเพิ่มข้อมูลการจองได้'});
 								return next();
 							} else {
 								// TODO: add reservation_id as response
@@ -330,8 +331,8 @@ pg.connect(pg_constr, function(err, pgc, done) {
 
 		pgc.query('select id, state from locker where is_alive=true and logical_id = $1', [logical_id], function(err, result) {
 			if (err) {
-				console.error('Error D00X: Cannot get locker data from database');
-				res.send(401, {code: 'L00X', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้ ' + logical_id + ' ได้'});
+				console.error('Error D03: Cannot get locker data from database');
+				res.send(401, {code: 'D03', message:'ไม่สามารถเรียกข้อมูลล็อกเกอร์ได้'});
 				return next();
 			}
 
@@ -339,23 +340,23 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			var state = result.rows[0].state;
 
 			if (state != 1 && state != 3) {
-				console.error('Error D00X: Invlid locker state change');
-				res.send(401, { code: 'L00X', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
+				console.error('Error L08: Invalid locker\'s state for releasing');
+				res.send(401, { code: 'L08', message: 'สถานะในการเลิกใช้งานไม่ถูกต้อง' });
 				return next();
 			} else {
 				// conn.query("SELECT count(*) as count FROM reservation WHERE id IN (select max(id) from reservation group by locker_id) and personal_id=? group by personal_id", [personal_id], function(err, rows, result) {
 				// TODO: using dynamic id from RFID card
 				pgc.query("SELECT id FROM reservation WHERE id = (SELECT max(id) FROM reservation WHERE locker_id=$1)", [locker_id], function(err, rows, result) {
 					if (err) {
-						console.error('Error D00X: No such reservation found');
-						res.send(401, { code: 'L00X', message: 'ไม่พบการจองที่ต้องการ' });
+						console.error('Error D06: Cannot get reservation data from database');
+						res.send(401, { code: 'D06', message: 'ไม่สามารถตรวจสอบสถานะการจองของผู้ใช้ได้' });
 						return next();
 					}
 
 					pgc.query("UPDATE locker SET state = 4 WHERE id = $1", [locker_id], function(err, result) {
 						if (err) {
-							console.error('Error D00X: Cannot update locker state');
-							res.send(401, { code: 'L00X', message: 'ไม่สามารถเปลี่ยนสถานะล็อกเกอร์ได้' });
+							console.error('Error D05: Cannot update locker data');
+							res.send(401, { code: 'D05', message: 'ไม่สามารถเปลี่ยนสถานะล็อกเกอร์ได้' });
 							return next();
 						}
 						res.send(200);
