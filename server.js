@@ -6,12 +6,17 @@ var pg_constr = config.sfmt("postgres://{0}:{1}@{2}/{3}", config.db.client.usern
 var can = require('socketcan');
 var rjwt = require('restify-jwt');
 var jwt = require('jsonwebtoken');
+var ldap = require('ldapjs');
 var sha1 = require('sha1');
 var server = restify.createServer({
 	name: 'locker_api'
 });
 var io = require('socket.io').listen(server.server);
 var log_ts = require('log-timestamp')(function() { return '[' + new Date().toString() + ']' });
+
+var ldapc = ldap.createClient({
+	url: 'ldap://' + config.ldap.host
+});
 
 restify.CORS.ALLOW_HEADERS.push('authorization');
 server.use(restify.CORS());
