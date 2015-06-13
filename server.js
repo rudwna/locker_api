@@ -217,29 +217,54 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			return next();
 		}
 
+		ldapc.bind(username + '@rmutk.ac.th', password, function(err) {
+			if (err) {
+				console.error('Error L11: LDAP authenication failed');
+				res.send(401, {code: 'L11', message: 'ไม่สามารถเข้าสู่ระบบได้'});
+			} else {
+				pgc.query('select id, name from locker_user where username = $1', [username], function(err, result) {
+					if (err) {
+						console.error('Error D09: Cannot get user data from database');
+						res.send(401, {code: 'D09', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
+					}
+
+					if (result.rows.length == 0) {
+						// Alternative dont use name for display, use student id insted
+						pgc.query('insert into locker_user(id) values=($1)', [username]);
+					});
+
+					client.unbind();
+					var profile = {
+						id: result.rows[0].id,
+						user: username
+					};
+
+					// return token & name
+					var token = jwt.sign(profile, secret);
+					res.json({ token });
+
+				})
+			}
+		});
+
 		pgc.query('select id from locker_user where username = $1 and password = $2', [username, sha1(password)], function(err, result) {
 			if (err) {
-				console.error('Error D09: Cannot get user data from database');
-				res.send(401, {code: 'D09', message: 'ไม่สามารถรับข้อมูลลผู้ใช้จากฐานข้อมูลได้'});
-				return next();
+				throw err;
 			}
 
 			if (result.rows.length == 0) {
-				console.error('Error L06: Invalid username/password used for authentication');
-				res.send(401, {code: 'L06', message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
-				return next();
+				res.send(401, {code: 'invaliduserpassword', message:'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'});
 			}
 
 			var profile = {
 				id: result.rows[0].id,
-				username: username
+				user: username
 			};
 
-			var token = jwt.sign(profile, config.jwt.secret);
+			var token = jwt.sign(profile, secret);
 			res.json({ token: token });
-			console.log('Info: login success from user u#' + result.rows[0].id + ',' + username);
-			return next();
-		})
+		});
+
 	});
 
 	server.get('/user/is_reserved', function(req, res, next) {
