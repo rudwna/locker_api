@@ -222,7 +222,7 @@ pg.connect(pg_constr, function(err, pgc, done) {
 			return next();
 		}
 
-		ldapc.bind(username + '@rmutk.ac.th', password, function(err) {
+		ldapc.bind(username + config.ldap.suffix, password, function(err) {
 			if (err) {
 				console.error('Error L11: LDAP authenication failed');
 				res.send(401, {code: 'L11', message: 'ไม่สามารถเข้าสู่ระบบได้'});
